@@ -135,9 +135,38 @@ const eliminarUsuario = async (req, res) => {
   }
 };
 
+/**
+ * Cambiar la contraseña de un usuario
+ */
+const cambiarClave = async (req, res) => {
+    const { id } = req.params;
+    const { nueva_clave } = req.body;
+  
+    if (!nueva_clave) {
+      return res.status(400).json({ error: "La nueva clave es obligatoria" });
+    }
+  
+    try {
+      // Hashear la nueva contraseña
+      const hashedPassword = await bcrypt.hash(nueva_clave, 10);
+  
+      await pool.query(
+        "UPDATE usuarios SET password_hash = $1 WHERE id_usuario = $2",
+        [hashedPassword, id]
+      );
+  
+      res.json({ message: "Contraseña actualizada con éxito" });
+    } catch (err) {
+      console.error("Error al cambiar clave:", err);
+      res.status(500).json({ error: "Error interno al actualizar la clave" });
+    }
+  };
+  
+
 module.exports = {
   obtenerUsuarios,
   crearUsuario,
   actualizarUsuario,
   eliminarUsuario,
+  cambiarClave,
 };
