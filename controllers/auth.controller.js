@@ -1,6 +1,7 @@
 const pool = require("../models/db");
 const bcrypt = require("bcrypt");
 const generarSlug = require("../utils/slugify");
+const { registrarBitacora, registrarError } = require("../utils/logger");
 
 /**
  * Registra una nueva empresa y un usuario administrador
@@ -81,52 +82,56 @@ const correoExistente = await pool.query(
  * Login de administrador por correo y clave
  */
 const loginAdministrador = async (req, res) => {
-    const { correo, clave } = req.body;
-  
-    if (!correo || !clave) {
-      return res.status(400).json({ error: "Correo y clave son obligatorios." });
+  const { correo, clave } = req.body;
+
+  if (!correo || !clave) {
+    return res.status(400).json({ error: "Correo y clave son obligatorios." });
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT * FROM usuarios WHERE correo = $1",
+      [correo]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado." });
     }
-  
-    try {
-      // Buscar usuario por correo
-      const userResult = await pool.query(
-        "SELECT * FROM usuarios WHERE correo = $1",
-        [correo]
-      );
-  
-      if (userResult.rowCount === 0) {
-        return res.status(404).json({ error: "Usuario no encontrado." });
-      }
-  
-      const usuario = userResult.rows[0];
-  
-      // Verificar rol de administrador (id_rol = 1)
-      if (usuario.id_rol !== 1) {
-        return res.status(403).json({ error: "No tiene permisos de administrador." });
-      }
-  
-      // Comparar la clave con el hash
-      const claveValida = await bcrypt.compare(clave, usuario.password_hash);
-  
-      if (!claveValida) {
-        return res.status(401).json({ error: "Clave incorrecta." });
-      }
-  
-      // Si todo bien, devolvemos datos básicos
-      res.status(200).json({
-        message: "Login exitoso",
-        id_usuario: usuario.id_usuario,
-        nombre: usuario.nombre,
-        apellido: usuario.apellido,
-        id_empresa: usuario.id_empresa,
-        correo: usuario.correo
-      });
-  
-    } catch (err) {
-      console.error("Error en login administrador:", err);
-      res.status(500).json({ error: "Error interno del servidor." });
+
+    const usuario = result.rows[0];
+
+    if (usuario.id_rol !== 1) {
+      return res.status(403).json({ error: "No tiene permisos de administrador." });
     }
-  };
+
+    const claveValida = await bcrypt.compare(clave, usuario.password_hash);
+    if (!claveValida) {
+      return res.status(401).json({ error: "Clave incorrecta." });
+    }
+
+    // 🎯 Registrar bitácora
+    await registrarBitacora(
+      usuario.id_usuario,
+      usuario.id_empresa,
+      "LOGIN_ADMIN",
+      `Administrador ${usuario.nombre} ${usuario.apellido} inició sesión`
+    );
+
+    res.status(200).json({
+      message: "Login exitoso",
+      id_usuario: usuario.id_usuario,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido,
+      correo: usuario.correo,
+      id_empresa: usuario.id_empresa
+    });
+
+  } catch (err) {
+    console.error("Error en loginAdministrador:", err.message);
+    await registrarError("error", err.message, "loginAdministrador");
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+};
 
 /**
  * Login de empleado usando slug de empresa + código de empleado
@@ -179,6 +184,14 @@ const loginEmpleado = async (req, res) => {
         return res.status(401).json({ error: "Clave incorrecta." });
       }
   
+    // 🎯 Registrar bitácora
+    await registrarBitacora(
+      empleado.id_usuario,
+      empleado.id_empresa,
+      "LOGIN_EMPLEADO",
+      `Empleado ${empleado.nombre} ${empleado.apellido} inició sesión`
+    );
+
       // Si todo bien, devolver info básica
       res.status(200).json({
         message: "Login exitoso",
@@ -191,6 +204,7 @@ const loginEmpleado = async (req, res) => {
   
     } catch (err) {
       console.error("Error en login de empleado:", err);
+      await registrarError("error", err.message, "loginEmpleado");
       res.status(500).json({ error: "Error interno del servidor." });
     }
   };

@@ -1,7 +1,6 @@
 const pool = require("../models/db");
 const bcrypt = require("bcrypt");
-
-
+const { registrarBitacora, registrarError } = require("../utils/logger");
 
 
 
@@ -38,11 +37,15 @@ const cambiarClave = async (req, res) => {
  * Importación de empleados desde JSON (simula CSV)
  */
 const importarEmpleados = async (req, res) => {
-  const empleados = req.body;
+  const empleados = req.body.empleados;
+  const id_admin = req.body.id_admin; // Admin que ejecuta
+  const id_empresa = req.body.id_empresa;
 
-  if (!Array.isArray(empleados) || empleados.length === 0) {
-    return res.status(400).json({ error: "Debe enviar un array de empleados válido." });
+  if (!Array.isArray(empleados) || empleados.length === 0 || !id_admin || !id_empresa) {
+    return res.status(400).json({ error: "Datos inválidos o incompletos para importar." });
   }
+
+  let importados = 0;
 
   try {
     for (const emp of empleados) {
@@ -50,17 +53,16 @@ const importarEmpleados = async (req, res) => {
         codigo_empleado,
         nombre,
         apellido,
-        correo,
-        id_empresa
+        correo
       } = emp;
 
-      // Validación de campos mínimos
-      if (!codigo_empleado || !nombre || !apellido || !correo || !id_empresa) {
+      // Validación
+      if (!codigo_empleado || !nombre || !apellido || !correo) {
         console.log("Empleado inválido:", emp);
-        continue; // Se lo brinca si falta algo
+        continue;
       }
 
-      // Generar clave automática → ej: sramirezEMP0
+      // Generar clave automática
       const primeraLetra = nombre.trim().charAt(0).toLowerCase();
       const apellidoLimpio = apellido.trim().toLowerCase();
       const codigoRecortado = codigo_empleado.trim().slice(0, 4);
@@ -68,24 +70,29 @@ const importarEmpleados = async (req, res) => {
 
       const passwordHash = await bcrypt.hash(claveGenerada, 10);
 
-      // Insertar en base de datos
       await pool.query(
         `INSERT INTO usuarios (id_empresa, codigo_empleado, nombre, apellido, correo, password_hash, id_rol, estado, fecha_creacion)
          VALUES ($1, $2, $3, $4, $5, $6, 2, true, NOW())`,
         [id_empresa, codigo_empleado, nombre, apellido, correo, passwordHash]
       );
 
-      console.log(`Empleado ${nombre} ${apellido} insertado ✅`);
+      importados++;
     }
 
-    res.status(200).json({ message: "Empleados importados correctamente." });
+    // Bitácora
+    const accion = "IMPORTAR_EMPLEADOS";
+    const detalle = `Se importaron ${importados} empleados correctamente desde CSV simulado`;
+
+    await registrarBitacora(id_admin, id_empresa, accion, detalle);
+
+    res.status(200).json({ message: `${importados} empleados importados correctamente.` });
 
   } catch (err) {
-    console.error("Error al importar empleados:", err);
+    console.error("Error al importar empleados:", err.message);
+    await registrarError("error", err.message, "importarEmpleados");
     res.status(500).json({ error: "Error al importar empleados." });
   }
 };
-
 
 /**
  * Obtener lista de empleados con filtros opcionales
@@ -98,9 +105,7 @@ const obtenerEmpleadosConFiltros = async (req, res) => {
     if (!empresa || isNaN(parseInt(empresa))) {
       return res.status(400).json({ error: "id_empresa inválido o ausente." });
     }
-    console.log("empresa:", empresa);
-    console.log("estado:", estado);
-    console.log("nombre:", nombre);
+
     let query = `
       SELECT id_usuario, codigo_empleado, nombre, apellido, correo, estado
       FROM usuarios
@@ -133,14 +138,32 @@ const obtenerEmpleadosConFiltros = async (req, res) => {
  */
 const actualizarEmpleado = async (req, res) => {
   const id = req.params.id;
-  const { nombre, apellido, correo, codigo_empleado, id_empresa } = req.body;
+  const { nombre, apellido, correo, codigo_empleado, id_empresa,id_admin  } = req.body;
+  let nombre_anterior,apellido_anterior,correo_anterior,codigo_empleado_anterior;
 
   // Validación básica
-  if (!nombre || !apellido || !correo || !codigo_empleado || !id_empresa) {
+  if (!nombre || !apellido || !correo || !codigo_empleado || !id_empresa || !id_admin) {
     return res.status(400).json({ error: "Faltan campos obligatorios." });
   }
 
   try {
+    // Consulta los datos anteriores
+    const result_anterior = await pool.query(
+      `SELECT * FROM usuarios
+       WHERE id_usuario = $1 AND id_empresa = $2 AND id_rol = 2`,
+      [ id, id_empresa]
+    );
+    if (result_anterior.rowCount > 0) {
+      const usuarioAnterior = result_anterior.rows[0];
+      nombre_anterior = usuarioAnterior.nombre;
+      apellido_anterior = usuarioAnterior.apellido;
+      correo_anterior = usuarioAnterior.correo;
+      codigo_empleado_anterior = usuarioAnterior.codigo_empleado;
+    } else {
+      // Si no encontró al empleado antes, tiramos error antes de actualizar
+      return res.status(404).json({ error: "Empleado no encontrado." });
+    }
+    // Actualiza los datos
     const result = await pool.query(
       `UPDATE usuarios
        SET nombre = $1, apellido = $2, correo = $3, codigo_empleado = $4
@@ -149,8 +172,17 @@ const actualizarEmpleado = async (req, res) => {
     );
 
     if (result.rowCount === 0) {
+      await registrarError("warning", `Empleado ${id} no encontrado o no pertenece a empresa ${id_empresa}`, "actualizarEmpleado");
       return res.status(404).json({ error: "Empleado no encontrado o no pertenece a la empresa." });
     }
+
+    const accion = "ACTUALIZAR_EMPLEADO";
+    const detalle = `Se actualiza el empleado:  Nombre Anterior:  ${nombre_anterior} / Nombre nuevo: ${nombre} 
+                    Apellido Anterior:  ${apellido_anterior} / Apellido Nuevo: ${apellido}
+                    Correo Anterior: ${correo_anterior} / Correo Nuevo : ${correo}
+                    Codigo Anterior: ${codigo_empleado_anterior} / Codigo Nuevo: ${codigo_empleado}`;
+
+    await registrarBitacora(id_admin, id_empresa, accion, detalle);
 
     res.status(200).json({ message: "Empleado actualizado correctamente." });
 
@@ -160,16 +192,17 @@ const actualizarEmpleado = async (req, res) => {
   }
 };
 
+
+
 /**
  * Activa o desactiva un empleado de forma lógica
  */
 const cambiarEstadoEmpleado = async (req, res) => {
   const id = req.params.id;
-  const { id_empresa, nuevo_estado } = req.body;
+  const { id_empresa, nuevo_estado, id_admin } = req.body;
 
-  // Validación básica
-  if (!id_empresa || typeof nuevo_estado !== "boolean") {
-    return res.status(400).json({ error: "Faltan datos o el estado no es válido." });
+  if (!id_empresa || typeof nuevo_estado !== "boolean" || !id_admin) {
+    return res.status(400).json({ error: "Faltan datos obligatorios." });
   }
 
   try {
@@ -181,18 +214,23 @@ const cambiarEstadoEmpleado = async (req, res) => {
     );
 
     if (result.rowCount === 0) {
+      await registrarError("warning", `Empleado ${id} no encontrado o no pertenece a empresa ${id_empresa}`, "cambiarEstadoEmpleado");
       return res.status(404).json({ error: "Empleado no encontrado o no pertenece a la empresa." });
     }
 
-    const mensaje = nuevo_estado ? "Empleado activado correctamente." : "Empleado desactivado correctamente.";
-    res.status(200).json({ message: mensaje });
+    const accion = nuevo_estado ? "ACTIVAR_EMPLEADO" : "DESACTIVAR_EMPLEADO";
+    const detalle = `Empleado ${id} fue ${nuevo_estado ? "activado" : "desactivado"}`;
+
+    await registrarBitacora(id_admin, id_empresa, accion, detalle);
+
+    res.status(200).json({ message: `Empleado ${nuevo_estado ? "activado" : "desactivado"} correctamente.` });
 
   } catch (err) {
-    console.error("Error al cambiar estado del empleado:", err);
+    console.error("Error al cambiar estado:", err.message);
+    await registrarError("error", err.message, "cambiarEstadoEmpleado");
     res.status(500).json({ error: "Error interno del servidor." });
   }
 };
-
 
 
 
