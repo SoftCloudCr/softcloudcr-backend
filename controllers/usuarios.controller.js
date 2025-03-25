@@ -215,6 +215,51 @@ const importarEmpleados = async (req, res) => {
 };
 
 
+/**
+ * Obtener lista de empleados con filtros opcionales
+ */
+const obtenerEmpleadosConFiltros = async (req, res) => {
+  try {
+    const { empresa, estado, nombre } = req.query;
+
+    // Validación estricta del ID de empresa
+    if (!empresa || isNaN(parseInt(empresa))) {
+      return res.status(400).json({ error: "id_empresa inválido o ausente." });
+    }
+    console.log("empresa:", empresa);
+    console.log("estado:", estado);
+    console.log("nombre:", nombre);
+    let query = `
+      SELECT id_usuario, codigo_empleado, nombre, apellido, correo, estado
+      FROM usuarios
+      WHERE id_empresa = $1 AND id_rol = 2
+    `;
+    let params = [empresa];
+    let index = 2;
+
+    if (estado === "true" || estado === "false") {
+      query += ` AND estado = $${index}`;
+      params.push(estado === "true");
+      index++;
+    }
+
+    if (nombre && nombre.trim() !== "") {
+      query += ` AND (LOWER(nombre) LIKE $${index} OR LOWER(apellido) LIKE $${index})`;
+      params.push(`%${nombre.toLowerCase()}%`);
+    }
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error al obtener empleados:", err);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};
+
+
+
+
+
 module.exports = {
   obtenerUsuarios,
   crearUsuario,
@@ -222,4 +267,5 @@ module.exports = {
   eliminarUsuario,
   cambiarClave,
   importarEmpleados,
+  obtenerEmpleadosConFiltros,
 };
