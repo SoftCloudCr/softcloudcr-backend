@@ -128,16 +128,83 @@ const obtenerEmpleadosConFiltros = async (req, res) => {
   }
 };
 
+/**
+ * Actualiza los datos de un empleado asegurando que sea de la misma empresa
+ */
+const actualizarEmpleado = async (req, res) => {
+  const id = req.params.id;
+  const { nombre, apellido, correo, codigo_empleado, id_empresa } = req.body;
+
+  // Validación básica
+  if (!nombre || !apellido || !correo || !codigo_empleado || !id_empresa) {
+    return res.status(400).json({ error: "Faltan campos obligatorios." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE usuarios
+       SET nombre = $1, apellido = $2, correo = $3, codigo_empleado = $4
+       WHERE id_usuario = $5 AND id_empresa = $6 AND id_rol = 2`,
+      [nombre, apellido, correo, codigo_empleado, id, id_empresa]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Empleado no encontrado o no pertenece a la empresa." });
+    }
+
+    res.status(200).json({ message: "Empleado actualizado correctamente." });
+
+  } catch (err) {
+    console.error("Error al actualizar empleado:", err);
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+};
+
+/**
+ * Activa o desactiva un empleado de forma lógica
+ */
+const cambiarEstadoEmpleado = async (req, res) => {
+  const id = req.params.id;
+  const { id_empresa, nuevo_estado } = req.body;
+
+  // Validación básica
+  if (!id_empresa || typeof nuevo_estado !== "boolean") {
+    return res.status(400).json({ error: "Faltan datos o el estado no es válido." });
+  }
+
+  try {
+    const result = await pool.query(
+      `UPDATE usuarios
+       SET estado = $1
+       WHERE id_usuario = $2 AND id_empresa = $3 AND id_rol = 2`,
+      [nuevo_estado, id, id_empresa]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Empleado no encontrado o no pertenece a la empresa." });
+    }
+
+    const mensaje = nuevo_estado ? "Empleado activado correctamente." : "Empleado desactivado correctamente.";
+    res.status(200).json({ message: mensaje });
+
+  } catch (err) {
+    console.error("Error al cambiar estado del empleado:", err);
+    res.status(500).json({ error: "Error interno del servidor." });
+  }
+};
+
+
+
+
+
 
 
 
 
 module.exports = {
-  obtenerUsuarios,
-  crearUsuario,
-  actualizarUsuario,
-  eliminarUsuario,
+  actualizarEmpleado, 
   cambiarClave,
   importarEmpleados,
   obtenerEmpleadosConFiltros,
+  cambiarEstadoEmpleado,
 };
