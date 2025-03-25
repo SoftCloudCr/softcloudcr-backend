@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const pool = require("./models/db");
+const capturarSesion = require("./middlewares/capturarSesion");
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/usuarios", require("./routes/usuarios.routes"));
 app.use("/api/auth", require("./routes/auth.routes"));
-
+app.use(capturarSesion); // o solo en /auth/login-admin
 
 // Ruta de prueba
 app.get("/", (req, res) => {
