@@ -442,6 +442,7 @@ const vistaPreviaCuestionario = async (req, res) => {
         id_pregunta: pregunta.id_pregunta,
         texto: pregunta.texto,
         tipo: pregunta.tipo,
+        url_imagen: pregunta.url_imagen || null,
         opciones: opciones.rows
       });
     }

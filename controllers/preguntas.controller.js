@@ -25,7 +25,7 @@ const obtenerPreguntas = async (req, res) => {
  * Crea una nueva pregunta
  */
 const crearPregunta = async (req, res) => {
-  const { id_cuestionario, id_empresa, tipo, texto, id_admin } = req.body;
+  const { id_cuestionario, id_empresa, tipo, texto, url_imagen, id_admin } = req.body;
 
   if (!id_cuestionario || !id_empresa || !tipo || !texto || !id_admin) {
     return res.status(400).json({ error: "Faltan campos obligatorios." });
@@ -33,10 +33,10 @@ const crearPregunta = async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO preguntas_catalogo (id_cuestionario, id_empresa, tipo, texto, estado)
-       VALUES ($1, $2, $3, $4, true)
+      `INSERT INTO preguntas_catalogo (id_cuestionario, id_empresa, tipo, texto, url_imagen, estado)
+       VALUES ($1, $2, $3, $4, $5, true)
        RETURNING *`,
-      [id_cuestionario, id_empresa, tipo, texto]
+      [id_cuestionario, id_empresa, tipo, texto, url_imagen || null]
     );
 
     // Marcar cuestionario como borrador por seguridad
@@ -63,7 +63,7 @@ const crearPregunta = async (req, res) => {
  */
 const actualizarPregunta = async (req, res) => {
   const { id_pregunta } = req.params;
-  const { tipo, texto, id_empresa, id_admin } = req.body;
+  const { tipo, texto, url_imagen, id_empresa, id_admin } = req.body;
 
   if (!tipo || !texto || !id_empresa || !id_admin) {
     return res.status(400).json({ error: "Faltan campos obligatorios." });
@@ -83,10 +83,10 @@ const actualizarPregunta = async (req, res) => {
     const preguntaPrev = previa.rows[0];
 
     await pool.query(
-      `UPDATE preguntas_catalogo
-       SET tipo = $1, texto = $2
-       WHERE id_pregunta = $3 AND id_empresa = $4`,
-      [tipo, texto, id_pregunta, id_empresa]
+      `UPDATE preguntas_catalogo 
+       SET tipo = $1, texto = $2, url_imagen = $3
+       WHERE id_pregunta = $4 AND id_empresa = $5`,
+       [ tipo, texto, url_imagen || null, id_pregunta, id_empresa ]
     );
 
     // También ponemos en borrador el cuestionario por seguridad
