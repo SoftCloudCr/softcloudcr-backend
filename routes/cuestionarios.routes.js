@@ -5,7 +5,10 @@ const {
   crearCuestionario,
   actualizarCuestionario,
   eliminarCuestionario,
-  cambiarEstadoCuestionario
+  cambiarEstadoCuestionario,
+  publicarCuestionario,
+  verificarCuestionario,
+  vistaPreviaCuestionario
 } = require("../controllers/cuestionarios.controller");
 
 // Obtener todos los cuestionarios de una empresa
@@ -21,5 +24,14 @@ router.patch("/estado/:id_cuestionario", cambiarEstadoCuestionario    );
 
 // Eliminar cuestionario
 router.delete("/eliminar/:id_cuestionario", eliminarCuestionario);
+
+// Publicar Cuestionario
+router.patch("/publicar/:id_cuestionario", publicarCuestionario);
+
+// Verificar la integridad del cuestionario
+router.get("/verificar/:id_cuestionario", verificarCuestionario);
+
+// Vista previa
+router.get("/vista-previa/:id_cuestionario", vistaPreviaCuestionario);
 
 module.exports = router;
