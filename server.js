@@ -7,7 +7,7 @@ const pool = require("./models/db");
 const capturarSesion = require("./middlewares/capturarSesion");
 const cuestionariosRoutes = require("./routes/cuestionarios.routes");
 const preguntasRoutes = require("./routes/preguntas.routes");
-
+const opcionesRoutes = require("./routes/opciones.routes");
 
 
 
@@ -23,7 +23,7 @@ app.use("/api/auth", require("./routes/auth.routes"));
 app.use(capturarSesion); 
 app.use("/api/cuestionarios", cuestionariosRoutes);
 app.use("/api/preguntas", preguntasRoutes);
-
+app.use("/api/opciones", opcionesRoutes);
 
 
 // Ruta de prueba
