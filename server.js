@@ -1,9 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+
+
 const pool = require("./models/db");
 const capturarSesion = require("./middlewares/capturarSesion");
 const cuestionariosRoutes = require("./routes/cuestionarios.routes");
+const preguntasRoutes = require("./routes/preguntas.routes");
+
+
+
 
 dotenv.config();
 
@@ -16,6 +22,9 @@ app.use("/api/usuarios", require("./routes/usuarios.routes"));
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use(capturarSesion); 
 app.use("/api/cuestionarios", cuestionariosRoutes);
+app.use("/api/preguntas", preguntasRoutes);
+
+
 
 // Ruta de prueba
 app.get("/", (req, res) => {
