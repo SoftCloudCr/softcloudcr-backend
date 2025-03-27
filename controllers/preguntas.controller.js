@@ -28,6 +28,7 @@ const crearPregunta = async (req, res) => {
   const { id_cuestionario, id_empresa, tipo, texto, url_imagen, id_admin } = req.body;
 
   if (!id_cuestionario || !id_empresa || !tipo || !texto || !id_admin) {
+  console.log(id_cuestionario +" + "+ id_empresa + " + "+ )
     return res.status(400).json({ error: "Faltan campos obligatorios." });
   }
 
