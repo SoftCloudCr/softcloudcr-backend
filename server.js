@@ -8,7 +8,7 @@ const capturarSesion = require("./middlewares/capturarSesion");
 const cuestionariosRoutes = require("./routes/cuestionarios.routes");
 const preguntasRoutes = require("./routes/preguntas.routes");
 const opcionesRoutes = require("./routes/opciones.routes");
-
+const departamentosRoutes = require("./routes/departamentos.routes");
 
 
 dotenv.config();
@@ -24,6 +24,9 @@ app.use(capturarSesion);
 app.use("/api/cuestionarios", cuestionariosRoutes);
 app.use("/api/preguntas", preguntasRoutes);
 app.use("/api/opciones", opcionesRoutes);
+app.use("/api/departamentos", departamentosRoutes);
+
+
 
 
 // Ruta de prueba
