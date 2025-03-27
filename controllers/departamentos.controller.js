@@ -164,10 +164,58 @@ const eliminarDepartamento = async (req, res) => {
     }
   };
   
+/**
+ * Obtiene la cantidad de empleados por departamento (para dashboard)
+ */
+const obtenerResumenDepartamentos = async (req, res) => {
+  const { id_empresa } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT d.id_departamento, d.nombre, COUNT(ud.id_usuario) AS cantidad_empleados
+       FROM departamentos d
+       LEFT JOIN usuarios_departamento ud ON d.id_departamento = ud.id_departamento AND ud.id_empresa = $1
+       WHERE d.id_empresa = $1 AND d.estado = true
+       GROUP BY d.id_departamento
+       ORDER BY d.nombre`,
+      [id_empresa]
+    );
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    await registrarError("error", error.message, "obtenerResumenDepartamentos");
+    res.status(500).json({ error: "Error al obtener resumen de departamentos." });
+  }
+};
+
+/**
+ * Obtiene los departamentos inactivos de una empresa
+ */
+const obtenerDepartamentosInactivos = async (req, res) => {
+  const { id_empresa } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT * FROM departamentos
+       WHERE id_empresa = $1 AND estado = false
+       ORDER BY nombre ASC`,
+      [id_empresa]
+    );
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    await registrarError("error", error.message, "obtenerDepartamentosInactivos");
+    res.status(500).json({ error: "Error al obtener departamentos inactivos." });
+  }
+};
+
+
 
 module.exports = {
   crearDepartamento,
   obtenerDepartamentos,
   actualizarDepartamento,
   eliminarDepartamento,
+  obtenerResumenDepartamentos,
+  obtenerDepartamentosInactivos,
 };

@@ -95,10 +95,40 @@ const obtenerEmpleadosPorDepartamento = async (req, res) => {
   }
 };
 
+
+/**
+ * Obtiene todos los departamentos a los que pertenece un empleado
+ */
+const obtenerDepartamentosPorEmpleado = async (req, res) => {
+    const { id_usuario, id_empresa } = req.params;
+  
+    try {
+      const result = await pool.query(
+        `SELECT d.id_departamento, d.nombre, d.descripcion
+         FROM departamentos d
+         INNER JOIN usuarios_departamento ud ON d.id_departamento = ud.id_departamento
+         WHERE ud.id_usuario = $1 AND ud.id_empresa = $2 AND d.estado = true`,
+        [id_usuario, id_empresa]
+      );
+  
+      res.status(200).json(result.rows);
+    } catch (error) {
+      await registrarError("error", error.message, "obtenerDepartamentosPorEmpleado");
+      res.status(500).json({ error: "Error al obtener departamentos del empleado." });
+    }
+  };
+
+
+
+
+
+
+
+
 module.exports = {
     asociarEmpleadoADepartamento,
     eliminarEmpleadoDeDepartamento,
     obtenerEmpleadosPorDepartamento,
-
+    obtenerDepartamentosPorEmpleado,
 
 };
