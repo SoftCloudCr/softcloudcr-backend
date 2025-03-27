@@ -11,7 +11,7 @@ const opcionesRoutes = require("./routes/opciones.routes");
 const departamentosRoutes = require("./routes/departamentos.routes");
 const departamentosEmpleadosRoutes = require("./routes/departamentos.empleados.routes");
 const precapacitacionesRoutes = require("./routes/precapacitaciones.routes");
-
+const precapacitacionesArchivosRoutes = require("./routes/precapacitaciones.archivos.routes");
 
 dotenv.config();
 
@@ -29,7 +29,12 @@ app.use("/api/opciones", opcionesRoutes);
 app.use("/api/departamentos", departamentosRoutes);
 app.use("/api/departamentos-empleados", departamentosEmpleadosRoutes);
 app.use("/api/precapacitaciones", precapacitacionesRoutes);
+app.use("/api/precapacitaciones/archivos", precapacitacionesArchivosRoutes);
 
+
+
+// Habilitar acceso estático a PDF
+app.use("/uploads", express.static("uploads"));
 
 // Ruta de prueba
 app.get("/", (req, res) => {
