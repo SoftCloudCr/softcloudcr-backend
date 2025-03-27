@@ -12,6 +12,9 @@ const departamentosRoutes = require("./routes/departamentos.routes");
 const departamentosEmpleadosRoutes = require("./routes/departamentos.empleados.routes");
 const precapacitacionesRoutes = require("./routes/precapacitaciones.routes");
 const precapacitacionesArchivosRoutes = require("./routes/precapacitaciones.archivos.routes");
+const preCapDeptosRoutes = require("./routes/precapacitaciones.departamentos.routes");
+const preCapPreviewRoutes = require("./routes/precapacitaciones.preview.routes");
+
 
 dotenv.config();
 
@@ -30,6 +33,11 @@ app.use("/api/departamentos", departamentosRoutes);
 app.use("/api/departamentos-empleados", departamentosEmpleadosRoutes);
 app.use("/api/precapacitaciones", precapacitacionesRoutes);
 app.use("/api/precapacitaciones/archivos", precapacitacionesArchivosRoutes);
+app.use("/api/precapacitaciones/departamentos", preCapDeptosRoutes);
+app.use("/api/precapacitaciones/preview", preCapPreviewRoutes);
+
+
+
 
 
 
