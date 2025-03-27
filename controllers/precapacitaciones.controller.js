@@ -178,89 +178,108 @@ const activarPreCapacitacion = async (req, res) => {
 };
 
 /**
- * Cambiar estado de una plantilla (activar o desactivar visibilidad)
+ * Cambia el estado de una pre-capacitación (activar o desactivar visibilidad)
  */
 const cambiarEstadoPreCapacitacion = async (req, res) => {
-    const { id_capacitacion } = req.params;
-    const { id_empresa, id_admin, estado } = req.body;
-  
-    if (!id_empresa || !id_admin || typeof estado !== "boolean") {
-      return res.status(400).json({ error: "Faltan datos o estado inválido." });
+  const { id_capacitacion } = req.params;
+  const { id_empresa, id_admin, estado } = req.body;
+
+  if (!id_empresa || !id_admin || typeof estado !== "boolean") {
+    return res.status(400).json({ error: "Faltan datos o estado inválido." });
+  }
+
+  try {
+    // Validar que la plantilla exista
+    const plantilla = await pool.query(
+      `SELECT * FROM pre_capacitaciones 
+       WHERE id_capacitacion = $1 AND id_empresa = $2`,
+      [id_capacitacion, id_empresa]
+    );
+
+    if (plantilla.rowCount === 0) {
+      return res.status(404).json({ error: "Plantilla no encontrada." });
     }
-  
-    try {
-      const plantilla = await pool.query(
-        `SELECT * FROM pre_capacitaciones WHERE id_capacitacion = $1 AND id_empresa = $2`,
-        [id_capacitacion, id_empresa]
+
+    const data = plantilla.rows[0];
+
+    if (estado === true) {
+      // Validar que el cuestionario esté activo y no en borrador
+      const cuestionario = await pool.query(
+        `SELECT * FROM cuestionarios_catalogo 
+         WHERE id_cuestionario = $1 AND id_empresa = $2 
+         AND estado = true AND borrador = false`,
+        [data.id_cuestionario, id_empresa]
       );
-  
-      if (plantilla.rowCount === 0) {
-        return res.status(404).json({ error: "Plantilla no encontrada." });
+
+      if (cuestionario.rowCount === 0) {
+        return res.status(400).json({ error: "El cuestionario no está activo o está en borrador." });
       }
-  
-      const data = plantilla.rows[0];
-  
-      if (estado === true) {
-        // Validar cuestionario
-        const cuestionario = await pool.query(
-          `SELECT * FROM cuestionarios_catalogo 
-           WHERE id_cuestionario = $1 AND id_empresa = $2 AND estado = true AND borrador = false`,
-          [data.id_cuestionario, id_empresa]
-        );
-  
-        if (cuestionario.rowCount === 0) {
-          return res.status(400).json({ error: "El cuestionario no está activo o está en borrador." });
-        }
-  
-        // Validar departamentos
-        const departamentos = await pool.query(
-          `SELECT * FROM pre_capacitaciones_departamento WHERE id_capacitacion = $1`,
-          [id_capacitacion]
-        );
-  
-        if (departamentos.rowCount === 0) {
-          return res.status(400).json({ error: "Debe asignar al menos un departamento." });
-        }
-  
-        // Validar PDF si se requiere
-        if (data.requiere_pdf) {
-          const archivos = await pool.query(
-            `SELECT * FROM pre_capacitaciones_archivos WHERE id_capacitacion = $1`,
-            [id_capacitacion]
-          );
-  
-          if (archivos.rowCount === 0) {
-            return res.status(400).json({ error: "Debe subir al menos un PDF para activar esta plantilla." });
-          }
-        }
-  
-        // Marcar que ya no es borrador al activarse
-        await pool.query(
-          `UPDATE pre_capacitaciones SET estado = true, borrador = false, fecha_activacion = CURRENT_TIMESTAMP
-           WHERE id_capacitacion = $1 AND id_empresa = $2`,
-          [id_capacitacion, id_empresa]
-        );
-  
-        await registrarBitacora(id_admin, id_empresa, "ACTIVAR_PRE_CAPACITACION", `Se activó plantilla ID ${id_capacitacion}`);
-        return res.status(200).json({ message: "Plantilla activada correctamente." });
-      }
-  
-      // Si es desactivación
-      await pool.query(
-        `UPDATE pre_capacitaciones SET estado = false
+
+      // Validar que tenga al menos un departamento asociado
+      const departamentos = await pool.query(
+        `SELECT * FROM pre_capacitaciones_departamentos 
          WHERE id_capacitacion = $1 AND id_empresa = $2`,
         [id_capacitacion, id_empresa]
       );
-  
-      await registrarBitacora(id_admin, id_empresa, "DESACTIVAR_PRE_CAPACITACION", `Se desactivó plantilla ID ${id_capacitacion}`);
-      res.status(200).json({ message: "Plantilla desactivada correctamente." });
-  
-    } catch (error) {
-      await registrarError("error", error.message, "cambiarEstadoPreCapacitacion");
-      res.status(500).json({ error: "Error al cambiar el estado de la plantilla." });
+
+      if (departamentos.rowCount === 0) {
+        return res.status(400).json({ error: "Debe asignar al menos un departamento." });
+      }
+
+      // Validar que tenga archivos si requiere PDF
+      if (data.requiere_pdf) {
+        const archivos = await pool.query(
+          `SELECT * FROM pre_capacitaciones_archivos 
+           WHERE id_capacitacion = $1 AND id_empresa = $2`,
+          [id_capacitacion, id_empresa]
+        );
+
+        if (archivos.rowCount === 0) {
+          return res.status(400).json({ error: "Debe subir al menos un PDF para activar esta plantilla." });
+        }
+      }
+
+      // Activar plantilla y actualizar fecha de activación
+      await pool.query(
+        `UPDATE pre_capacitaciones 
+         SET estado = true, borrador = false, fecha_activacion = CURRENT_TIMESTAMP
+         WHERE id_capacitacion = $1 AND id_empresa = $2`,
+        [id_capacitacion, id_empresa]
+      );
+
+      await registrarBitacora(
+        id_admin,
+        id_empresa,
+        "ACTIVAR_PRE_CAPACITACION",
+        `Se activó la plantilla '${data.nombre}' (ID ${id_capacitacion})`
+      );
+
+      return res.status(200).json({ message: "Plantilla activada correctamente." });
     }
-  };
-  
+
+    // Si es desactivación, solo cambia el estado (no toca borrador)
+    await pool.query(
+      `UPDATE pre_capacitaciones 
+       SET estado = false 
+       WHERE id_capacitacion = $1 AND id_empresa = $2`,
+      [id_capacitacion, id_empresa]
+    );
+
+    await registrarBitacora(
+      id_admin,
+      id_empresa,
+      "DESACTIVAR_PRE_CAPACITACION",
+      `Se desactivó la plantilla '${data.nombre}' (ID ${id_capacitacion})`
+    );
+
+    res.status(200).json({ message: "Plantilla desactivada correctamente." });
+  } catch (error) {
+    console.error("Error en cambiarEstadoPreCapacitacion:", error);
+    await registrarError("error", error.message, "cambiarEstadoPreCapacitacion");
+    res.status(500).json({ error: "Error al cambiar el estado de la plantilla." });
+  }
+};
+
 
 module.exports = {
   crearPreCapacitacion,
