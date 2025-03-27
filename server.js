@@ -14,6 +14,10 @@ const precapacitacionesRoutes = require("./routes/precapacitaciones.routes");
 const precapacitacionesArchivosRoutes = require("./routes/precapacitaciones.archivos.routes");
 const preCapDeptosRoutes = require("./routes/precapacitaciones.departamentos.routes");
 const preCapPreviewRoutes = require("./routes/precapacitaciones.preview.routes");
+const rutasCapacitaciones = require("./routes/capacitaciones.routes");
+
+
+
 
 
 dotenv.config();
@@ -35,7 +39,7 @@ app.use("/api/precapacitaciones", precapacitacionesRoutes);
 app.use("/api/precapacitaciones/archivos", precapacitacionesArchivosRoutes);
 app.use("/api/precapacitaciones/departamentos", preCapDeptosRoutes);
 app.use("/api/precapacitaciones/preview", preCapPreviewRoutes);
-
+app.use("/api/capacitaciones", rutasCapacitaciones);
 
 
 
