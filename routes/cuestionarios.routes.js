@@ -8,7 +8,8 @@ const {
   cambiarEstadoCuestionario,
   publicarCuestionario,
   verificarCuestionario,
-  vistaPreviaCuestionario
+  vistaPreviaCuestionario,
+  iniciarCuestionario
 } = require("../controllers/cuestionarios.controller");
 
 // Obtener todos los cuestionarios de una empresa
@@ -33,5 +34,8 @@ router.get("/verificar/:id_cuestionario", verificarCuestionario);
 
 // Vista previa
 router.get("/vista-previa/:id_cuestionario", vistaPreviaCuestionario);
+
+// iniciar su cuestionario asignado
+router.get("/cuestionario/iniciar/:id_asignacion", iniciarCuestionario);
 
 module.exports = router;
