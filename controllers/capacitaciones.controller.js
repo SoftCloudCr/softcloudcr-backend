@@ -167,6 +167,87 @@ const activarCapacitacion = async (req, res) => {
   }
 };
 
+// *****
+// Vsta Previa de las capacitaciones
+// *****
+const vistaPreviaCapacitacionEmpleado = async (req, res) => {
+  const { id_asignacion } = req.params;
+
+  if (!id_asignacion) {
+    return res.status(400).json({ error: "Falta el id_asignacion." });
+  }
+
+  try {
+    // 1. Obtener la asignación, capacitación y cuestionario vinculado
+    const result = await pool.query(`
+      SELECT 
+        ca.nombre,
+        ca.objetivo_estrategico,
+        ca.fecha_inicio,
+        ca.fecha_limite,
+        ca.nota_minima,
+        ca.requiere_pdf,
+        cu.intentos_permitidos,
+        uc.estado AS estado_asignacion
+      FROM usuarios_capacitaciones uc
+      INNER JOIN capacitaciones_activas ca ON ca.id_capacitacion = uc.id_capacitacion
+      INNER JOIN cuestionarios_usuarios cu ON cu.id_capacitacion = ca.id_capacitacion
+      WHERE uc.id_asignacion = $1
+    `, [id_asignacion]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Asignación no encontrada." });
+    }
+
+    const datos = result.rows[0];
+
+    // 2. Contar intentos realizados
+    const intentos = await pool.query(`
+      SELECT COUNT(*) FROM intentos_cuestionario
+      WHERE id_asignacion = $1
+    `, [id_asignacion]);
+
+    const intentos_realizados = parseInt(intentos.rows[0].count);
+
+    // 3. Obtener PDF si existen
+    let archivos_pdf = [];
+    if (datos.requiere_pdf) {
+      const archivos = await pool.query(`
+        SELECT id_archivo, nombre_original, url_archivo
+        FROM pre_capacitaciones_archivos
+        WHERE id_capacitacion = (
+          SELECT id_capacitacion FROM usuarios_capacitaciones WHERE id_asignacion = $1
+        )
+      `, [id_asignacion]);
+
+      archivos_pdf = archivos.rows;
+    }
+
+    // 4. Armar respuesta
+    return res.status(200).json({
+      nombre: datos.nombre,
+      objetivo_estrategico: datos.objetivo_estrategico,
+      fecha_inicio: datos.fecha_inicio,
+      fecha_limite: datos.fecha_limite,
+      nota_minima: datos.nota_minima,
+      requiere_pdf: datos.requiere_pdf,
+      archivos_pdf,
+      intentos_permitidos: datos.intentos_permitidos,
+      intentos_realizados,
+      estado_asignacion: datos.estado_asignacion
+    });
+
+  } catch (error) {
+    await registrarError("error", error.message, "vistaPreviaCapacitacionEmpleado");
+    return res.status(500).json({ error: "Error al obtener vista previa de la capacitación." });
+  }
+};
+
+
+
+
+
 module.exports = {
   activarCapacitacion,
+  vistaPreviaCapacitacionEmpleado,
 };

@@ -16,6 +16,7 @@ const preCapDeptosRoutes = require("./routes/precapacitaciones.departamentos.rou
 const preCapPreviewRoutes = require("./routes/precapacitaciones.preview.routes");
 const rutasCapacitaciones = require("./routes/capacitaciones.routes");
 const intentosRoutes = require("./routes/intentos.routes");
+const empleados = require("./routes/empleados.routes");
 
 
 
@@ -41,6 +42,7 @@ app.use("/api/precapacitaciones/departamentos", preCapDeptosRoutes);
 app.use("/api/precapacitaciones/preview", preCapPreviewRoutes);
 app.use("/api/capacitaciones", rutasCapacitaciones);
 app.use("/api", intentosRoutes);
+app.use("/api/empleado", empleados);
 
 
 
