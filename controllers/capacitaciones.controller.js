@@ -18,6 +18,11 @@ const activarCapacitacion = async (req, res) => {
   const client = await pool.connect();
 
   try {
+
+    // Validación de fechas
+if (new Date(fecha_limite) < new Date(fecha_inicio)) {
+    return res.status(400).json({ error: "La fecha límite no puede ser anterior a la fecha de inicio." });
+  }
     await client.query("BEGIN");
 
     // 1. Obtener la plantilla
@@ -85,10 +90,18 @@ const activarCapacitacion = async (req, res) => {
 
     // 3. Clonar cuestionario
     const cuestionarioNuevo = await client.query(
-      `INSERT INTO cuestionarios_usuarios (id_capacitacion, id_empresa, nombre, intentos_permitidos, fecha_creacion)
-       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP) RETURNING *`,
-      [idCapacitacionActiva, id_empresa, cuestionarioBase.rows[0].nombre, cuestionarioBase.rows[0].intentos_permitidos]
-    );
+    `INSERT INTO cuestionarios_usuarios (
+      id_capacitacion, id_empresa, nombre, intentos_permitidos, nota_minima, fecha_creacion
+    )
+     VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP) RETURNING *`,
+    [
+      idCapacitacionActiva,
+      id_empresa,
+      cuestionarioBase.rows[0].nombre,
+      cuestionarioBase.rows[0].intentos_permitidos,
+      cuestionarioBase.rows[0].nota_minima // ⬅️ este es el único valor nuevo
+    ]
+  );
 
     const idCuestionarioNuevo = cuestionarioNuevo.rows[0].id_cuestionario_usuario;
 
@@ -121,9 +134,9 @@ const activarCapacitacion = async (req, res) => {
       }
     }
 
-    // 5. Asignar empleados de departamentos
+    // 5. Asignar empleados de departamentos y registrar relación histórica
     const empleados = await client.query(
-      `SELECT DISTINCT u.id_usuario FROM usuarios u
+      `SELECT DISTINCT u.id_usuario, ud.id_departamento FROM usuarios u
        INNER JOIN usuarios_departamentos ud ON u.id_usuario = ud.id_usuario
        WHERE ud.id_departamento IN (${departamentos.rows.map((_, i) => `$${i + 1}`).join(",")})
        AND u.id_empresa = $${departamentos.rows.length + 1} AND u.id_rol = 2`,
@@ -135,6 +148,12 @@ const activarCapacitacion = async (req, res) => {
         `INSERT INTO usuarios_capacitaciones (id_capacitacion, id_usuario, id_empresa, estado)
          VALUES ($1, $2, $3, 'pendiente')`,
         [idCapacitacionActiva, emp.id_usuario, id_empresa]
+      );
+
+      await client.query(
+        `INSERT INTO capacitacion_departamento_usuario (id_empresa, id_capacitacion, id_departamento, id_usuario)
+         VALUES ($1, $2, $3, $4)`,
+        [id_empresa, idCapacitacionActiva, emp.id_departamento, emp.id_usuario]
       );
     }
 
