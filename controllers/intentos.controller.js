@@ -117,11 +117,12 @@ const registrarIntento = async (req, res) => {
       const duracion = null; // en segundos, puedes calcularlo si lo pasás desde el frontend
       const userAgent = req.headers['user-agent'] || 'Desconocido';
   
-      await client.query(
+      const intento = await client.query(
         `INSERT INTO intentos_cuestionario (
           id_asignacion, id_empresa, id_cuestionario_usuario, fecha_intento,
           respuestas, nota, aprobado, duracion_segundos, user_agent
-        ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8)`,
+        ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5, $6, $7, $8)
+         RETURNING id_intento`,
         [
           id_asignacion,
           id_empresa,
@@ -132,6 +133,39 @@ const registrarIntento = async (req, res) => {
           duracion,
           userAgent
         ]
+      );
+      const id_intento = intento.rows[0].id_intento;
+          // 5. Actualizar resultado si es mejor
+
+        const resultadoPrevio = await client.query(
+            `SELECT nota FROM resultados_cuestionario
+            WHERE id_usuario_capacitacion = $1 AND id_empresa = $2`,
+            [id_asignacion, id_empresa]
+        );
+        
+        if (resultadoPrevio.rowCount === 0 || nota > resultadoPrevio.rows[0].nota) {
+            await client.query(
+            `INSERT INTO resultados_cuestionario (
+                id_usuario_capacitacion, id_intento, id_empresa,
+                nota, aprobado, fecha_registro
+            )
+            VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+            ON CONFLICT (id_usuario_capacitacion)
+            DO UPDATE SET
+                nota = EXCLUDED.nota,
+                aprobado = EXCLUDED.aprobado,
+                id_intento = EXCLUDED.id_intento,
+                fecha_registro = EXCLUDED.fecha_registro`,
+            [id_asignacion, id_intento, id_empresa, nota, aprobado]
+            );
+        }
+  
+  
+      // 6. Registrar en gamificación (solo base)
+      await client.query(
+        `INSERT INTO gamificacion (id_empresa, id_usuario, id_asignacion, id_cuestionario_usuario, puntos_obtenidos, evento, fecha_obtencion)
+         VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)`,
+        [id_empresa, id_usuario, id_asignacion, id_asignacion, Math.round(nota), "INTENTO_REALIZADO"]
       );
   
       await client.query("COMMIT");
@@ -151,6 +185,8 @@ const registrarIntento = async (req, res) => {
     }
   };
   
+// TODO: Registrar interacción en historial_interacciones_capacitacion si el estado cambia manualmente
+
 
 module.exports = {
   registrarIntento,
