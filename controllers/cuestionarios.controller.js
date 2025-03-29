@@ -566,6 +566,67 @@ const iniciarCuestionario = async (req, res) => {
 };
 
 
+/**
+ * Vista previa de un cuestionario asignado a un empleado (sin respuestas correctas)
+ */
+const obtenerVistaCuestionarioAsignado = async (req, res) => {
+  const { id_asignacion } = req.params;
+  const { id_empresa } = req.query;
+
+  if (!id_asignacion || !id_empresa) {
+    return res.status(400).json({ error: "Faltan parámetros requeridos." });
+  }
+
+  try {
+    // 1. Obtener el cuestionario vinculado a la asignación
+    const datosCuestionario = await pool.query(
+      `SELECT c.id_cuestionario_usuario
+       FROM usuarios_capacitaciones uc
+       INNER JOIN cuestionarios_usuarios c ON uc.id_capacitacion = c.id_capacitacion
+       WHERE uc.id_asignacion = $1 AND uc.id_empresa = $2`,
+      [id_asignacion, id_empresa]
+    );
+
+    if (datosCuestionario.rowCount === 0) {
+      return res.status(404).json({ error: "Cuestionario no encontrado para la asignación." });
+    }
+
+    const idCuestionario = datosCuestionario.rows[0].id_cuestionario_usuario;
+
+    // 2. Obtener preguntas del cuestionario
+    const preguntas = await pool.query(
+      `SELECT id_pregunta_usuario AS id_pregunta, tipo, texto, url_imagen
+       FROM preguntas_usuarios
+       WHERE id_cuestionario_usuario = $1 AND id_empresa = $2 AND estado = true`,
+      [idCuestionario, id_empresa]
+    );
+
+    const resultado = [];
+
+    for (const pregunta of preguntas.rows) {
+      // 3. Obtener opciones (sin mostrar cuáles son correctas)
+      const opciones = await pool.query(
+        `SELECT id_opcion_usuario AS id_opcion, texto
+         FROM opciones_usuarios
+         WHERE id_pregunta_usuario = $1 AND id_empresa = $2 AND estado = true`,
+        [pregunta.id_pregunta, id_empresa]
+      );
+
+      resultado.push({
+        ...pregunta,
+        opciones: opciones.rows,
+      });
+    }
+
+    res.status(200).json({
+      id_cuestionario: idCuestionario,
+      preguntas: resultado,
+    });
+  } catch (error) {
+    await registrarError("error", error.message, "obtenerVistaCuestionarioAsignado");
+    res.status(500).json({ error: "Error al obtener la vista previa del cuestionario." });
+  }
+};
 
 
 
@@ -588,4 +649,5 @@ module.exports = {
   verificarCuestionario,
   vistaPreviaCuestionario,
   iniciarCuestionario,
+  obtenerVistaCuestionarioAsignado
 };
