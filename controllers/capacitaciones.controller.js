@@ -92,6 +92,25 @@ const activarCapacitacion = async (req, res) => {
       );
   
       const idCapacitacionActiva = nuevaCapacitacion.rows[0].id_capacitacion;
+
+      // 2.1 Clonar archivos PDF de la plantilla (si requiere_pdf está activo)
+if (datos.requiere_pdf) {
+  const archivosPlantilla = await client.query(
+    `SELECT nombre_archivo, url_archivo
+     FROM pre_capacitaciones_archivos
+     WHERE id_capacitacion = $1`,
+    [id_capacitacion]
+  );
+
+  for (const archivo of archivosPlantilla.rows) {
+    await client.query(
+      `INSERT INTO capacitaciones_archivos (id_capacitacion, nombre_archivo, url_archivo)
+       VALUES ($1, $2, $3)`,
+      [idCapacitacionActiva, archivo.nombre_archivo, archivo.url_archivo]
+    );
+  }
+}
+
     // 3. Clonar cuestionario
     const cuestionarioNuevo = await client.query(
       `INSERT INTO cuestionarios_usuarios (id_capacitacion, id_empresa, nombre, intentos_permitidos, fecha_creacion)
@@ -243,11 +262,101 @@ const vistaPreviaCapacitacionEmpleado = async (req, res) => {
   }
 };
 
+// controllers/capacitaciones.controller.js
 
+const listarIntentosPorCapacitacion = async (req, res) => {
+  const { id_capacitacion } = req.params;
+  const { id_empresa } = req.body;
+
+ 
+  if (!id_capacitacion || !id_empresa) {
+    return res.status(400).json({ error: "Faltan datos obligatorios." });
+  }
+
+  try {
+    // Validar que la capacitación exista
+    const capacitacion = await pool.query(
+      `SELECT * FROM capacitaciones_activas
+       WHERE id_capacitacion = $1 AND id_empresa = $2`,
+      [id_capacitacion, id_empresa]
+    );
+
+    if (capacitacion.rowCount === 0) {
+      return res.status(404).json({ error: "Capacitación no encontrada." });
+    }
+
+    // Traer los intentos de esa capacitación
+    const intentos = await pool.query(
+      `SELECT 
+         i.id_intento,
+         u.id_usuario,
+         u.nombre AS nombre_usuario,
+         d.nombre AS departamento,
+         i.nota,
+         i.aprobado,
+         i.fecha_intento
+       FROM intentos_cuestionario i
+       INNER JOIN usuarios_capacitaciones uc ON uc.id_asignacion = i.id_asignacion
+       INNER JOIN usuarios u ON u.id_usuario = uc.id_usuario
+       INNER JOIN capacitacion_departamento_usuario cdu ON cdu.id_usuario = u.id_usuario 
+         AND cdu.id_capacitacion = uc.id_capacitacion
+       INNER JOIN departamentos d ON d.id_departamento = cdu.id_departamento
+       WHERE uc.id_capacitacion = $1 AND i.id_empresa = $2
+       ORDER BY i.fecha_intento DESC`,
+      [id_capacitacion, id_empresa]
+    );
+
+    res.status(200).json(intentos.rows);
+  } catch (error) {
+    await registrarError("error", error.message, "listarIntentosPorCapacitacion");
+    res.status(500).json({ error: "Error al listar intentos." });
+  }
+};
+
+
+/**
+ * Obtener los archivos PDF asociados a una capacitación activa (clonados al momento de activación)
+ */
+const obtenerArchivosCapacitacion = async (req, res) => {
+  const { id_capacitacion } = req.params;
+  const { id_empresa } = req.query;
+
+  if (!id_empresa) {
+    return res.status(400).json({ error: "Falta el parámetro id_empresa." });
+  }
+
+  try {
+    // Verificar que exista la capacitación activa
+    const resultado = await pool.query(
+      `SELECT * FROM capacitaciones_activas
+       WHERE id_capacitacion = $1 AND id_empresa = $2`,
+      [id_capacitacion, id_empresa]
+    );
+
+    if (resultado.rowCount === 0) {
+      return res.status(404).json({ error: "Capacitación activa no encontrada." });
+    }
+
+    // Obtener los archivos PDF clonados
+    const archivos = await pool.query(
+      `SELECT id_archivo, nombre_archivo, url_archivo
+       FROM capacitaciones_archivos
+       WHERE id_capacitacion = $1`,
+      [id_capacitacion]
+    );
+
+    res.status(200).json({ archivos: archivos.rows });
+  } catch (error) {
+    await registrarError("error", error.message, "obtenerArchivosCapacitacion");
+    res.status(500).json({ error: "Error al obtener los archivos de la capacitación." });
+  }
+};
 
 
 
 module.exports = {
   activarCapacitacion,
   vistaPreviaCapacitacionEmpleado,
+  listarIntentosPorCapacitacion,
+  obtenerArchivosCapacitacion,
 };
