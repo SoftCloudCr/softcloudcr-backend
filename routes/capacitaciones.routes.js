@@ -3,7 +3,8 @@ const router = express.Router();
 const { activarCapacitacion,
     vistaPreviaCapacitacionEmpleado,
     listarIntentosPorCapacitacion,
-    obtenerArchivosCapacitacion
+    obtenerArchivosCapacitacion,
+    resolverCuestionario
  } = require("../controllers/capacitaciones.controller");
 
 // Activar una capacitación real desde una plantilla
@@ -17,5 +18,9 @@ router.get("/admin/capacitaciones/:id_capacitacion/intentos",listarIntentosPorCa
 
 // Obtener los archivos
 router.get("/:id_capacitacion/archivos", obtenerArchivosCapacitacion);
+
+// Resolver Cuesionario
+router.get("/resolver/:id_asignacion", resolverCuestionario);
+
 
 module.exports = router;

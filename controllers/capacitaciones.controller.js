@@ -351,6 +351,107 @@ const obtenerArchivosCapacitacion = async (req, res) => {
     res.status(500).json({ error: "Error al obtener los archivos de la capacitación." });
   }
 };
+//***********
+// Resolver Cuesionario 
+// *****
+
+const resolverCuestionario = async (req, res) => {
+  const { id_asignacion } = req.params;
+  const { id_empresa, id_usuario } = req.query;
+
+  if (!id_empresa || !id_usuario) {
+    return res.status(400).json({ error: "Faltan parámetros obligatorios." });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1. Verificar la asignación y obtener datos
+    const asignacion = await client.query(
+      `SELECT a.estado, c.fecha_inicio, c.fecha_limite, cu.id_cuestionario_usuario, cu.intentos_permitidos
+       FROM usuarios_capacitaciones a
+       INNER JOIN capacitaciones_activas c ON c.id_capacitacion = a.id_capacitacion
+       INNER JOIN cuestionarios_usuarios cu ON cu.id_capacitacion = c.id_capacitacion
+       WHERE a.id_asignacion = $1 AND a.id_empresa = $2 AND a.id_usuario = $3`,
+      [id_asignacion, id_empresa, id_usuario]
+    );
+
+    if (asignacion.rowCount === 0) {
+      return res.status(404).json({ error: "Asignación no encontrada." });
+    }
+
+    const datos = asignacion.rows[0];
+
+    // 2. Validar estado y rango de fechas
+    const ahora = new Date();
+    const inicio = new Date(datos.fecha_inicio);
+    const limite = new Date(datos.fecha_limite);
+
+    if (datos.estado !== "pendiente") {
+      return res.status(400).json({ error: "Ya completaste esta capacitación o no está disponible." });
+    }
+
+    if (ahora < inicio) {
+      return res.status(400).json({ error: "La capacitación aún no ha iniciado." });
+    }
+
+    if (ahora > limite) {
+      return res.status(400).json({ error: "La capacitación ha vencido." });
+    }
+
+    // 3. Verificar intentos realizados
+    const intentos = await client.query(
+      `SELECT COUNT(*) FROM intentos_cuestionario
+       WHERE id_asignacion = $1 AND id_empresa = $2`,
+      [id_asignacion, id_empresa]
+    );
+
+    const hechos = parseInt(intentos.rows[0].count);
+    if (hechos >= datos.intentos_permitidos) {
+      return res.status(403).json({ error: "Ya alcanzaste el límite de intentos permitidos." });
+    }
+
+    // 4. Obtener preguntas y opciones
+    const preguntas = await client.query(
+      `SELECT p.id_pregunta_usuario AS id_pregunta, p.tipo, p.texto, p.url_imagen
+       FROM preguntas_usuarios p
+       WHERE p.id_cuestionario_usuario = $1 AND p.id_empresa = $2 AND p.estado = true`,
+      [datos.id_cuestionario_usuario, id_empresa]
+    );
+
+    const resultado = [];
+
+    for (const pregunta of preguntas.rows) {
+      const opciones = await client.query(
+        `SELECT id_opcion_usuario AS id_opcion, texto
+         FROM opciones_usuarios
+         WHERE id_pregunta_usuario = $1 AND id_empresa = $2 AND estado = true`,
+        [pregunta.id_pregunta, id_empresa]
+      );
+
+      resultado.push({
+        ...pregunta,
+        opciones: opciones.rows,
+      });
+    }
+
+    await client.query("COMMIT");
+
+    res.status(200).json({
+      id_cuestionario: datos.id_cuestionario_usuario,
+      preguntas: resultado,
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+    await registrarError("error", error.message, "resolverCuestionario");
+    res.status(500).json({ error: "Error al cargar el cuestionario." });
+  } finally {
+    client.release();
+  }
+};
 
 
 
@@ -359,4 +460,5 @@ module.exports = {
   vistaPreviaCapacitacionEmpleado,
   listarIntentosPorCapacitacion,
   obtenerArchivosCapacitacion,
+  resolverCuestionario,
 };
