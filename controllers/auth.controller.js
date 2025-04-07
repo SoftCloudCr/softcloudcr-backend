@@ -166,9 +166,9 @@ const loginEmpleado = async (req, res) => {
       "SELECT id_empresa FROM empresas WHERE slug_empresa = $1",
       [slugLimpiado]
     );
-    console.log(
-      `SELECT id_empresa FROM empresas WHERE slug_empresa = '${slug}'`
-    );
+   // console.log(
+    //  `SELECT id_empresa FROM empresas WHERE slug_empresa = '${slug}'`
+    //);
 
     if (empresaResult.rowCount === 0) {
       return res.status(404).json({ error: "Empresa no encontrada." });
@@ -214,10 +214,10 @@ const loginEmpleado = async (req, res) => {
     res.status(200).json({
       message: "Login exitoso",
       id_usuario: empleado.id_usuario,
-      nombre: empleado.nombre,
-      apellido: empleado.apellido,
-      codigo_empleado: empleado.codigo_empleado,
       id_empresa: empleado.id_empresa,
+      rol: empleado.id_rol,
+      nombre_usuario: `${empleado.nombre} ${empleado.apellido}`,
+      slug_empresa: slug
     });
   } catch (err) {
     console.error("Error en login de empleado:", err);
