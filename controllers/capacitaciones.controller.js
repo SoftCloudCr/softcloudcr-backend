@@ -96,7 +96,7 @@ const activarCapacitacion = async (req, res) => {
       // 2.1 Clonar archivos PDF de la plantilla (si requiere_pdf está activo)
 if (datos.requiere_pdf) {
   const archivosPlantilla = await client.query(
-    `SELECT nombre_archivo, url_archivo
+    `SELECT nombre_original, url_archivo,id_empresa
      FROM pre_capacitaciones_archivos
      WHERE id_capacitacion = $1`,
     [id_capacitacion]
@@ -104,9 +104,9 @@ if (datos.requiere_pdf) {
 
   for (const archivo of archivosPlantilla.rows) {
     await client.query(
-      `INSERT INTO capacitaciones_archivos (id_capacitacion, nombre_archivo, url_archivo)
-       VALUES ($1, $2, $3)`,
-      [idCapacitacionActiva, archivo.nombre_archivo, archivo.url_archivo]
+      `INSERT INTO capacitaciones_activas_archivos (id_capacitacion,id_empresa, nombre_original, url_archivo)
+       VALUES ($1, $2, $3, $4)`,
+      [idCapacitacionActiva,archivo.id_empresa, archivo.nombre_original, archivo.url_archivo]
     );
   }
 }
@@ -339,8 +339,8 @@ const obtenerArchivosCapacitacion = async (req, res) => {
 
     // Obtener los archivos PDF clonados
     const archivos = await pool.query(
-      `SELECT id_archivo, nombre_archivo, url_archivo
-       FROM capacitaciones_archivos
+      `SELECT id_archivo,id_empresa, nombre_original, url_archivo
+       FROM capacitaciones_activas_archivos
        WHERE id_capacitacion = $1`,
       [id_capacitacion]
     );

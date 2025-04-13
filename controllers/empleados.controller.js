@@ -61,7 +61,7 @@ const listarCapacitacionesPendientes = async (req, res) => {
          FROM usuarios_capacitaciones uc
          INNER JOIN capacitaciones_activas ca ON ca.id_capacitacion = uc.id_capacitacion
          INNER JOIN cuestionarios_usuarios cu ON cu.id_capacitacion = ca.id_capacitacion
-         WHERE uc.id_usuario = $1 AND uc.id_empresa = $2 AND uc.estado = 'pendiente'
+         WHERE uc.id_usuario = $1 AND uc.id_empresa = $2 AND uc.estado = 'pendiente' or uc.estado = 'reprobado'
          ORDER BY ca.fecha_inicio DESC`,
         [id_usuario, id_empresa]
       );
