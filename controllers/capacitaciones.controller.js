@@ -233,7 +233,7 @@ const vistaPreviaCapacitacionEmpleado = async (req, res) => {
     if (datos.requiere_pdf) {
       const archivos = await pool.query(`
         SELECT id_archivo, nombre_original, url_archivo
-        FROM pre_capacitaciones_archivos
+        FROM capacitaciones_activas_archivos
         WHERE id_capacitacion = (
           SELECT id_capacitacion FROM usuarios_capacitaciones WHERE id_asignacion = $1
         )
