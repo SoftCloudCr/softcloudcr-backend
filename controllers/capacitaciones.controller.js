@@ -389,7 +389,7 @@ const resolverCuestionario = async (req, res) => {
     const inicio = new Date(datos.fecha_inicio);
     const limite = new Date(datos.fecha_limite);
 
-    if (datos.estado !== "pendiente") {
+    if (!["pendiente", "en_progreso"].includes(datos.estado)) {
       return res.status(400).json({ error: "Ya completaste esta capacitación o no está disponible." });
     }
 
@@ -425,7 +425,7 @@ const resolverCuestionario = async (req, res) => {
 
     for (const pregunta of preguntas.rows) {
       const opciones = await client.query(
-        `SELECT id_opcion_usuario AS id_opcion, texto
+        `SELECT id_opcion_usuario AS id_opcion, texto, es_correcta
          FROM opciones_usuarios
          WHERE id_pregunta_usuario = $1 AND id_empresa = $2 AND estado = true`,
         [pregunta.id_pregunta, id_empresa]
