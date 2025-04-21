@@ -1,7 +1,65 @@
 const pool = require("../models/db");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const generarSlug = require("../utils/slugify");
 const { registrarBitacora, registrarError } = require("../utils/logger");
+
+/**
+ * Login de administrador con JWT
+ ***/
+const loginAdmin = async (req, res) => {
+  const { correo, clave } = req.body;
+
+  if (!correo || !clave) {
+    return res.status(400).json({ error: "Correo y clave requeridos" });
+  }
+
+  try {
+    const resultado = await pool.query(
+      "SELECT * FROM usuarios WHERE correo = $1 AND id_rol = 1", // solo admins
+      [correo]
+    );
+
+    if (resultado.rowCount === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    const usuario = resultado.rows[0];
+    const claveValida = await bcrypt.compare(clave, usuario.password_hash);
+
+    if (!claveValida) {
+      return res.status(401).json({ error: "Clave incorrecta" });
+    }
+
+    // 🎯 Generar token JWT
+    const token = jwt.sign(
+      {
+        id_usuario: usuario.id_usuario,
+        id_empresa: usuario.id_empresa,
+        correo: usuario.correo,
+        rol: usuario.id_rol
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "4h" }
+    );
+
+    res.status(200).json({
+      message: "Login exitoso",
+      token,
+      usuario: {
+        id_usuario: usuario.id_usuario,
+        nombre: usuario.nombre,
+        correo: usuario.correo,
+        id_empresa: usuario.id_empresa
+      }
+    });
+  } catch (error) {
+    console.error("Error en loginAdmin:", error.message);
+    res.status(500).json({ error: "Error en el servidor" });
+  }
+};
+
+
 
 /**
  * Registra una nueva empresa y un usuario administrador
@@ -282,4 +340,5 @@ module.exports = {
   loginAdministrador,
   loginEmpleado,
   cerrarSesion,
+  loginAdmin ,
 };

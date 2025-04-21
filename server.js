@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+require("dotenv").config();
 
 
 const pool = require("./models/db");
@@ -66,6 +67,7 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
-app.listen(PORT,'192.168.0.101', () => {
+app.listen(PORT,'10.0.5.143', () => {
+  //app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
