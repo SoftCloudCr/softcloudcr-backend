@@ -50,7 +50,10 @@ const loginAdmin = async (req, res) => {
         id_usuario: usuario.id_usuario,
         nombre: usuario.nombre,
         correo: usuario.correo,
-        id_empresa: usuario.id_empresa
+        id_empresa: usuario.id_empresa,
+        id_rol: usuario.id_rol,
+        apellido: usuario.apellido
+
       }
     });
   } catch (error) {
@@ -195,10 +198,12 @@ const loginAdministrador = async (req, res) => {
       apellido: usuario.apellido,
       correo: usuario.correo,
       id_empresa: usuario.id_empresa,
+      id_rol: usuario.id_rol,
     });
 
 
   } catch (err) {
+    console.log("➡️ BODY del login:", req.body);
     console.error("Error en loginAdministrador:", err.message);
     await registrarError("error", err.message, "loginAdministrador");
     res.status(500).json({ error: "Error interno del servidor." });

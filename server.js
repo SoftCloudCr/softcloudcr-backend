@@ -67,7 +67,7 @@ app.get("/api/test-db", async (req, res) => {
   }
 });
 
-app.listen(PORT,'10.0.5.143', () => {
+app.listen(PORT,'192.168.0.102', () => {
   //app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
